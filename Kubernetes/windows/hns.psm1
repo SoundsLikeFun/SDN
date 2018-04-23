@@ -298,7 +298,7 @@ function New-HnsRemoteEndpoint
 }
 
 
-function Attach-HnsHostEndpoint
+function Register-HnsHostEndpoint
 {
     param
     (
@@ -310,10 +310,10 @@ function Attach-HnsHostEndpoint
         CompartmentId = $CompartmentID;
     };
 
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "attach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "Register" -Id $EndpointID
 }
 
-function Attach-HNSVMEndpoint
+function Register-HNSVMEndpoint
 {
     param
     (
@@ -325,11 +325,11 @@ function Attach-HNSVMEndpoint
         VirtualNicName   = $VMNetworkAdapterName;
         SystemType    = "VirtualMachine";
     };
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "attach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "Register" -Id $EndpointID
 
 }
 
-function Attach-HNSEndpoint
+function Register-HNSEndpoint
 {
     param
     (
@@ -343,10 +343,10 @@ function Attach-HNSEndpoint
         CompartmentId = $CompartmentID;
     };
 
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "attach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request) -Action "Register" -Id $EndpointID
 }
 
-function Detach-HNSVMEndpoint
+function Unregister-HNSVMEndpoint
 {
     param
     (
@@ -356,10 +356,10 @@ function Detach-HNSVMEndpoint
         SystemType  = "VirtualMachine";
     };
 
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "Unregister" -Id $EndpointID
 }
 
-function Detach-HNSHostEndpoint
+function Unregister-HNSHostEndpoint
 {
     param
     (
@@ -369,10 +369,10 @@ function Detach-HNSHostEndpoint
         SystemType  = "Host";
     };
 
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "Unregister" -Id $EndpointID
 }
 
-function Detach-HNSEndpoint
+function Unregister-HNSEndpoint
 {
     param
     (
@@ -385,7 +385,7 @@ function Detach-HNSEndpoint
         SystemType="Container";
     };
 
-    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "detach" -Id $EndpointID
+    return Invoke-HNSRequest -Method POST -Type endpoints -Data (ConvertTo-Json $request ) -Action "Unregister" -Id $EndpointID
 }
 #########################################################################
 
@@ -457,12 +457,12 @@ Export-ModuleMember -Function New-HNSNetwork
 Export-ModuleMember -Function New-HNSEndpoint
 Export-ModuleMember -Function New-HnsRemoteEndpoint
 
-Export-ModuleMember -Function Attach-HNSHostEndpoint
-Export-ModuleMember -Function Attach-HNSVMEndpoint
-Export-ModuleMember -Function Attach-HNSEndpoint
-Export-ModuleMember -Function Detach-HNSHostEndpoint
-Export-ModuleMember -Function Detach-HNSVMEndpoint
-Export-ModuleMember -Function Detach-HNSEndpoint
+Export-ModuleMember -Function Register-HNSHostEndpoint
+Export-ModuleMember -Function Register-HNSVMEndpoint
+Export-ModuleMember -Function Register-HNSEndpoint
+Export-ModuleMember -Function Unregister-HNSHostEndpoint
+Export-ModuleMember -Function Unregister-HNSVMEndpoint
+Export-ModuleMember -Function Unregister-HNSEndpoint
 
 Export-ModuleMember -Function Get-HNSPolicyList
 Export-ModuleMember -Function Remove-HnsPolicyList

@@ -1,6 +1,22 @@
 Param(
+
+    [parameter(Mandatory = $true)] 
+    [string] $MasterIp,
+    
+    [parameter(Mandatory = $true)] 
+    [String] $InterfaceAlias,
+
+    [parameter(Mandatory = $false)]
+    [String]$NetworkMode = "L2Bridge", 
+
+    [parameter(Mandatory = $false)] 
     $clusterCIDR="192.168.0.0/16",
-    $NetworkMode = "L2Bridge"
+
+    [parameter(Mandatory = $false)]
+    $ComputerName = ((Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain).toLower(),
+
+    [Switch] $Install
+
 )
 
 # Todo : Get these values using kubectl
@@ -8,58 +24,53 @@ $KubeDnsSuffix ="svc.cluster.local"
 $KubeDnsServiceIp="11.0.0.10"
 $serviceCIDR="11.0.0.0/8"
 
-$WorkingDir = "c:\k"
+$WorkingDir = $PSScriptRoot
 $CNIPath = [Io.path]::Combine($WorkingDir , "cni")
 $CNIConfig = [Io.path]::Combine($CNIPath, "config", "$NetworkMode.conf")
 
 $endpointName = "cbr0"
 $vnicName = "vEthernet ($endpointName)"
 
-function
-Get-PodGateway($podCIDR)
+function Get-PodGateway($podCIDR)
 {
     # Current limitation of Platform to not use .1 ip, since it is reserved
     return $podCIDR.substring(0,$podCIDR.lastIndexOf(".")) + ".1"
 }
 
-function
-Get-PodEndpointGateway($podCIDR)
+function Get-PodEndpointGateway($podCIDR)
 {
     # Current limitation of Platform to not use .1 ip, since it is reserved
     return $podCIDR.substring(0,$podCIDR.lastIndexOf(".")) + ".2"
 }
 
-function
-Get-PodCIDR()
+function Get-PodCIDR()
 {
-    $podCIDR=c:\k\kubectl.exe --kubeconfig=c:\k\config get nodes/$($(hostname).ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
+    $podCIDR=kubectl.exe --kubeconfig=config get nodes/$($(hostname).ToLower()) -o custom-columns=podCidr:.spec.podCIDR --no-headers
     return $podCIDR
 }
 
-function
-Get-MgmtIpAddress()
+function Get-MgmtIpAddress()
 {
-    $na = Get-NetAdapter | ? Name -Like "vEthernet (Ethernet*"
+    $na = Get-NetAdapter | Where-Object Name -Like "*$interfaceAlias*"
     return (Get-NetIPAddress -InterfaceAlias $na.ifAlias -AddressFamily IPv4).IPAddress
 }
 
-function
-ConvertTo-DecimalIP
+function ConvertTo-DecimalIP
 {
   param(
     [Parameter(Mandatory = $true, Position = 0)]
     [Net.IPAddress] $IPAddress
   )
-  $i = 3; $DecimalIP = 0;
-  $IPAddress.GetAddressBytes() | % {
+  $i = 3
+  $DecimalIP = 0
+  $IPAddress.GetAddressBytes() | ForEach-Object {
     $DecimalIP += $_ * [Math]::Pow(256, $i); $i--
   }
 
   return [UInt32]$DecimalIP
 }
 
-function
-ConvertTo-DottedDecimalIP
+function ConvertTo-DottedDecimalIP
 {
   param(
     [Parameter(Mandatory = $true, Position = 0)]
@@ -76,35 +87,32 @@ ConvertTo-DottedDecimalIP
     return [String]::Join(".", $DottedIP)
 }
 
-function
-ConvertTo-MaskLength
+function ConvertTo-MaskLength
 {
   param(
     [Parameter(Mandatory = $True, Position = 0)]
     [Net.IPAddress] $SubnetMask
   )
-    $Bits = "$($SubnetMask.GetAddressBytes() | % {
+    $Bits = "$($SubnetMask.GetAddressBytes() | ForEach-Object {
       [Convert]::ToString($_, 2)
     } )" -replace "[\s0]"
     return $Bits.Length
 }
 
-function
-Get-MgmtSubnet
+function Get-MgmtSubnet
 {
-    $na = Get-NetAdapter | ? Name -Like "vEthernet (Ethernet*"
+    $na = Get-NetAdapter | Where-Object Name -Like "*$interfaceAlias*"
     if (!$na) {
       throw "Failed to find a suitable network adapter, check your network settings."
     }
     $addr = (Get-NetIPAddress -InterfaceAlias $na.ifAlias -AddressFamily IPv4).IPAddress
-    $mask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.ifIndex)).IPSubnet[0]
+    $mask = (Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object InterfaceIndex -eq $($na.ifIndex)).IPSubnet[0]
     $mgmtSubnet = (ConvertTo-DecimalIP $addr) -band (ConvertTo-DecimalIP $mask)
     $mgmtSubnet = ConvertTo-DottedDecimalIP $mgmtSubnet
     return "$mgmtSubnet/$(ConvertTo-MaskLength $mask)"
 }
 
-function
-Update-CNIConfig($podCIDR)
+function Update-CNIConfig($podCIDR)
 {
     $jsonSampleConfig = '{
   "cniVersion": "0.2.0",
@@ -160,21 +168,20 @@ Update-CNIConfig($podCIDR)
     Add-Content -Path $CNIConfig -Value (ConvertTo-Json $configJson -Depth 20)
 }
 
-function
-Test-PodCIDR($podCIDR)
+function Test-PodCIDR($podCIDR)
 {
     return $podCIDR.length -gt 0
 }
 
-$podCIDR = Get-PodCIDR
+$podCIDR = Get-PodCIDR 
 $podCidrDiscovered = Test-PodCIDR $podCIDR
 
 # if the podCIDR has not yet been assigned to this node, start the kubelet process to get the podCIDR, and then promptly kill it.
 if (-not $podCidrDiscovered)
 {
-    $argList = @("--hostname-override=$(hostname)","--pod-infra-container-image=kubeletwin/pause","--resolv-conf=""""", "--kubeconfig=c:\k\config")
+    $argList = @("--hostname-override=$(hostname)","--pod-infra-container-image=kubeletwin/pause","--resolv-conf=""""", "--kubeconfig=config")
 
-    $process = Start-Process -FilePath c:\k\kubelet.exe -PassThru -ArgumentList $argList
+    $process = Start-Process -FilePath kubelet.exe -PassThru -ArgumentList $argList
 
     # run kubelet until podCidr is discovered
     Write-Host "waiting to discover pod CIDR"
@@ -192,13 +199,13 @@ if (-not $podCidrDiscovered)
 }
 
 # startup the service
-ipmo C:\k\hns.psm1
-$hnsNetwork = Get-HnsNetwork | ? Name -EQ $NetworkMode.ToLower()
+Import-Module hns.psm1
+$hnsNetwork = Get-HnsNetwork | Where-Object Name -EQ $NetworkMode.ToLower()
 
 if ($hnsNetwork)
 {
     # Cleanup all containers
-    docker ps -q | foreach {docker rm $_ -f} 
+    docker ps -q | ForEach-Object {docker rm $_ -f} 
 
     Write-Host "Cleaning up old HNS network found" 
     Remove-HnsNetwork $hnsNetwork
@@ -211,7 +218,7 @@ $hnsNetwork = New-HNSNetwork -Type $NetworkMode -AddressPrefix $podCIDR -Gateway
 $podEndpointGW = Get-PodEndpointGateway $podCIDR
 
 $hnsEndpoint = New-HnsEndpoint -NetworkId $hnsNetwork.Id -Name $endpointName -IPAddress $podEndpointGW -Gateway "0.0.0.0" -Verbose
-Attach-HnsHostEndpoint -EndpointID $hnsEndpoint.Id -CompartmentID 1
+Register-HnsHostEndpoint -EndpointID $hnsEndpoint.Id -CompartmentID 1
 netsh int ipv4 set int "$vnicName" for=en
 #netsh int ipv4 set add "vEthernet (cbr0)" static $podGW 255.255.255.0
 
@@ -219,11 +226,21 @@ Start-Sleep 10
 # Add route to all other POD networks
 Update-CNIConfig $podCIDR
 
-c:\k\kubelet.exe --hostname-override=$(hostname) --v=6 `
-    --pod-infra-container-image=kubeletwin/pause --resolv-conf="" `
-    --allow-privileged=true --enable-debugging-handlers `
-    --cluster-dns=$KubeDnsServiceIp --cluster-domain=cluster.local `
-    --kubeconfig=c:\k\config --hairpin-mode=promiscuous-bridge `
-    --image-pull-progress-deadline=20m --cgroups-per-qos=false `
-    --enforce-node-allocatable="" `
-    --network-plugin=cni --cni-bin-dir="c:\k\cni" --cni-conf-dir "c:\k\cni\config"
+
+if ($Install) {
+
+    sc.exe create kubelet binPath="$PSScriptRoot\kubelet.exe --service --hostname-override=$($ComputerName) --v=6 --pod-infra-container-image=kubeletwin/pause --resolv-conf='' --allow-privileged=true --enable-debugging-handlers --cluster-dns=$KubeDnsServiceIp --cluster-domain=cluster.local --kubeconfig='$PSScriptRoot\config' --hairpin-mode=promiscuous-bridge --image-pull-progress-deadline=20m --cgroups-per-qos=false --enforce-node-allocatable='' --network-plugin=cni --cni-bin-dir='$PSScriptRoot\cni' --cni-conf-dir '$PSScriptRoot\cni\config'"
+
+}
+else {
+
+    kubelet.exe --hostname-override=$($ComputerName) --v=6 `
+        --pod-infra-container-image=kubeletwin/pause --resolv-conf="" `
+        --allow-privileged=true --enable-debugging-handlers `
+        --cluster-dns=$KubeDnsServiceIp --cluster-domain=cluster.local `
+        --kubeconfig=$PSScriptRoot\config --hairpin-mode=promiscuous-bridge `
+        --image-pull-progress-deadline=20m --cgroups-per-qos=false `
+        --enforce-node-allocatable="" `
+        --network-plugin=cni --cni-bin-dir="$PSScriptRoot\cni" --cni-conf-dir "$PSScriptRoot\cni\config"
+
+}
