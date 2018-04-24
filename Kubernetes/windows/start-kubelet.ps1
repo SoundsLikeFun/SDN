@@ -6,6 +6,15 @@ Param(
     [parameter(Mandatory = $true)] 
     [String] $InterfaceAlias,
 
+    [parameter(Mandatory = $false)] 
+    $KubeDnsSuffix ="svc.cluster.local",
+
+    [parameter(Mandatory = $false)] 
+    $KubeDnsServiceIp="11.0.0.10",
+
+    [parameter(Mandatory = $false)]
+    $serviceCIDR="11.0.0.0/8", 
+
     [parameter(Mandatory = $false)]
     [String]$NetworkMode = "L2Bridge", 
 
@@ -18,11 +27,6 @@ Param(
     [Switch] $Install
 
 )
-
-# Todo : Get these values using kubectl
-$KubeDnsSuffix ="svc.cluster.local"
-$KubeDnsServiceIp="11.0.0.10"
-$serviceCIDR="11.0.0.0/8"
 
 $WorkingDir = $PSScriptRoot
 $CNIPath = [Io.path]::Combine($WorkingDir , "cni")

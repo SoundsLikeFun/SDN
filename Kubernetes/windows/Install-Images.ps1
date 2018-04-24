@@ -10,7 +10,7 @@ $WindowsVersion = $(Get-ComputerInfo).WindowsVersion
 # Set image names
 switch ($WindowsVersion) {
 
-    1607    {
+    $null    {
     
                 $ImageNameNano = "microsoft/nanoserver:latest"
                 $ImageNameCore = "microsoft/windowsservercore:latest"

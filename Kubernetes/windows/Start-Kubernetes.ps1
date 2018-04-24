@@ -11,6 +11,15 @@ Param(
     [parameter(Mandatory = $true)] 
     [String] $InterfaceAlias,
 
+    [parameter(Mandatory = $false)] 
+    $KubeDnsSuffix ="svc.cluster.local",
+
+    [parameter(Mandatory = $false)] 
+    $KubeDnsServiceIp="11.0.0.10",
+
+    [parameter(Mandatory = $false)]
+    $serviceCIDR="11.0.0.0/8", 
+
     [parameter(Mandatory = $false)]
     [String]$NetworkMode = "L2Bridge", 
 
@@ -23,9 +32,8 @@ Set-Location $PSScriptRoot
 # Prepare POD infra Images
 Start-Process powershell $PSScriptRoot\Install-Images.ps1
 
-# Prepare Network & Start Infra services
-
-Start-Process powershell -ArgumentList "-File $PSScriptRoot\Start-Kubelet.ps1 -clusterCIDR $clusterCIDR -NetworkMode $NetworkMode -InterfaceAlias $InterfaceAlias"
+# Prepare Network and start infrastruture services
+Start-Process powershell -ArgumentList "-File $PSScriptRoot\Start-Kubelet.ps1 -clusterCIDR $clusterCIDR -NetworkMode $NetworkMode -InterfaceAlias $InterfaceAlias -KubeDnsSuffix $KubeDnsSuffix -KubeDnsServiceIp $KubeDnsServiceIp -serviceCIDR $serviceCIDR"
 
 Start-Sleep 10
 
